@@ -1,0 +1,921 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BloodBridge – Donor Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0f0f13; --surface: #17171e; --surface2: #1e1e28; --border: rgba(255,255,255,.07);
+    --red: #e63946; --red-dim: rgba(230,57,70,.12); --blue: #3a86ff; --green: #2ec4b6;
+    --orange: #f4a261; --text: #f0f0f5; --muted: #7a7a94; --sidebar-w: 260px;
+  }
+  body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); display: flex; min-height: 100vh; overflow-x: hidden; }
+  .sidebar { width: var(--sidebar-w); background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; position: fixed; top: 0; left: 0; bottom: 0; z-index: 100; transition: transform .3s cubic-bezier(.4,0,.2,1); }
+  .logo { display: flex; align-items: center; gap: 10px; padding: 24px 20px; border-bottom: 1px solid var(--border); }
+  .logo-icon { width: 36px; height: 36px; background: var(--red); border-radius: 10px; display: grid; place-items: center; font-size: 18px; }
+  .logo-text { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 18px; }
+  .logo-text span { color: var(--red); }
+  nav { flex: 1; padding: 16px 12px; display: flex; flex-direction: column; gap: 2px; }
+  .nav-label { font-size: 10px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); padding: 12px 8px 6px; }
+  .nav-item { display: flex; align-items: center; gap: 12px; padding: 11px 14px; border-radius: 10px; cursor: pointer; color: var(--muted); font-size: 14px; font-weight: 500; transition: all .18s; text-decoration: none; border: none; background: none; width: 100%; text-align: left; }
+  .nav-item:hover { color: var(--text); background: rgba(255,255,255,.05); }
+  .nav-item.active { color: #fff; background: var(--red-dim); box-shadow: inset 3px 0 0 var(--red); }
+  .nav-icon { font-size: 17px; width: 20px; text-align: center; flex-shrink: 0; }
+  .sidebar-footer { padding: 16px 12px; border-top: 1px solid var(--border); }
+  .user-card { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; background: var(--surface2); }
+  .avatar { width: 34px; height: 34px; border-radius: 50%; background: var(--red); display: grid; place-items: center; font-family: 'Syne', sans-serif; font-weight: 700; font-size: 14px; flex-shrink: 0; overflow: hidden; }
+  .avatar-img { width: 100%; height: 100%; object-fit: cover; border-radius: inherit; }
+  .user-info { flex: 1; min-width: 0; }
+  .user-name { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .user-type { font-size: 11px; color: var(--muted); }
+  .logout-btn { background: none; border: none; cursor: pointer; color: var(--muted); font-size: 16px; padding: 4px; border-radius: 6px; transition: color .15s; }
+  .logout-btn:hover { color: var(--red); }
+  .main { margin-left: var(--sidebar-w); flex: 1; display: flex; flex-direction: column; min-height: 100vh; }
+  .topbar { padding: 20px 32px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; background: var(--surface); position: sticky; top: 0; z-index: 10; }
+  .topbar h1 { font-family: 'Syne', sans-serif; font-size: 20px; font-weight: 700; }
+  .topbar-right { display: flex; align-items: center; gap: 14px; }
+  .notif-btn { position: relative; background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px; cursor: pointer; color: var(--text); font-size: 16px; transition: background .15s; }
+  .notif-btn:hover { background: var(--red-dim); }
+  .notif-dot { position: absolute; top: 6px; right: 6px; width: 7px; height: 7px; background: var(--red); border-radius: 50%; border: 2px solid var(--surface); }
+  .content { padding: 28px 32px; flex: 1; }
+  /* ── BloodBridge Chatbot Widget ── */
+  .chatbot-fab { position: fixed; bottom: 26px; right: 26px; width: 58px; height: 58px; border-radius: 50%; background: linear-gradient(135deg,var(--red),#b91c1c); border: none; cursor: pointer; display: grid; place-items: center; font-size: 26px; box-shadow: 0 6px 24px rgba(230,57,70,.45); z-index: 200; transition: transform .18s; }
+  .chatbot-fab:hover { transform: scale(1.07); }
+  .chatbot-fab .fab-dot { position: absolute; top: 4px; right: 4px; width: 12px; height: 12px; background: var(--green); border-radius: 50%; border: 2px solid var(--surface); }
+  .chatbot-panel { position: fixed; bottom: 96px; right: 26px; width: 360px; max-width: calc(100vw - 32px); height: 480px; max-height: calc(100vh - 140px); background: var(--surface); border: 1px solid var(--border); border-radius: 18px; box-shadow: 0 20px 60px rgba(0,0,0,.5); display: none; flex-direction: column; overflow: hidden; z-index: 200; }
+  .chatbot-panel.open { display: flex; }
+  .chatbot-header { background: linear-gradient(135deg,var(--red),#b91c1c); padding: 16px 18px; display: flex; align-items: center; gap: 10px; }
+  .chatbot-header .cb-icon { width: 34px; height: 34px; background: rgba(255,255,255,.2); border-radius: 10px; display: grid; place-items: center; font-size: 17px; flex-shrink: 0; }
+  .chatbot-header .cb-title { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 14.5px; color: #fff; }
+  .chatbot-header .cb-sub { font-size: 11px; color: rgba(255,255,255,.8); }
+  .chatbot-close { margin-left: auto; background: none; border: none; color: #fff; font-size: 18px; cursor: pointer; opacity: .85; }
+  .chatbot-close:hover { opacity: 1; }
+  .chatbot-body { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+  .cb-msg { max-width: 84%; padding: 10px 13px; border-radius: 14px; font-size: 13px; line-height: 1.5; }
+  .cb-msg.bot { align-self: flex-start; background: var(--surface2); color: var(--text); border-bottom-left-radius: 4px; }
+  .cb-msg.user { align-self: flex-end; background: var(--red); color: #fff; border-bottom-right-radius: 4px; }
+  .cb-suggestions { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 16px 10px; }
+  .cb-chip { background: var(--surface2); border: 1px solid var(--border); color: var(--muted); font-size: 11px; padding: 6px 10px; border-radius: 20px; cursor: pointer; transition: all .15s; }
+  .cb-chip:hover { color: var(--text); border-color: var(--red); }
+  .chatbot-input-row { display: flex; gap: 8px; padding: 12px; border-top: 1px solid var(--border); }
+  .chatbot-input-row input { flex: 1; background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 13px; outline: none; }
+  .chatbot-input-row input:focus { border-color: var(--red); }
+  .chatbot-send { background: var(--red); border: none; color: #fff; border-radius: 10px; width: 40px; flex-shrink: 0; cursor: pointer; font-size: 16px; }
+  .chatbot-send:hover { background: #c62835; }
+  .cb-typing { align-self: flex-start; display: flex; gap: 4px; padding: 10px 13px; background: var(--surface2); border-radius: 14px; border-bottom-left-radius: 4px; }
+  .cb-typing span { width: 6px; height: 6px; background: var(--muted); border-radius: 50%; animation: cbBlink 1.2s infinite ease-in-out; }
+  .cb-typing span:nth-child(2) { animation-delay: .2s; }
+  .cb-typing span:nth-child(3) { animation-delay: .4s; }
+  @keyframes cbBlink { 0%,80%,100%{opacity:.3} 40%{opacity:1} }
+  @media (max-width: 480px) { .chatbot-panel { right: 16px; bottom: 88px; width: calc(100vw - 32px); } .chatbot-fab { right: 16px; bottom: 16px; } }
+  .page { display: none; animation: fadeIn .25s ease; }
+  .page.active { display: block; }
+  @keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+  .stat-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 16px; margin-bottom: 28px; }
+  @media(max-width:1100px){ .stat-grid{grid-template-columns:repeat(2,1fr)} }
+  .stat-card { border-radius: 16px; padding: 22px 20px; display: flex; flex-direction: column; gap: 8px; position: relative; overflow: hidden; }
+  .stat-card.red   { background: linear-gradient(135deg,#e63946cc,#c1121f99); }
+  .stat-card.blue  { background: linear-gradient(135deg,#3a86ff99,#023e8a99); }
+  .stat-card.green { background: linear-gradient(135deg,#2ec4b699,#0a7163aa); }
+  .stat-card.orange{ background: linear-gradient(135deg,#f4a26199,#e76f5199); }
+  .stat-label { font-size: 12px; font-weight: 500; opacity: .8; text-transform: uppercase; letter-spacing: .08em; }
+  .stat-value { font-family: 'Syne', sans-serif; font-size: 28px; font-weight: 800; }
+  .stat-sub { font-size: 12px; opacity: .7; }
+  /* Reflection */
+  .stat-card::after { content:''; position:absolute; bottom:0; left:0; right:0; height:35%; background: linear-gradient(to bottom, transparent, rgba(255,255,255,0.06)); pointer-events:none; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 22px 24px; margin-bottom: 20px; }
+  .card-title { font-family: 'Syne', sans-serif; font-size: 15px; font-weight: 700; margin-bottom: 18px; display: flex; align-items: center; gap: 8px; }
+  .card-title span { color: var(--red); }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  thead th { text-align: left; font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); padding: 0 0 12px; border-bottom: 1px solid var(--border); }
+  tbody tr { border-bottom: 1px solid var(--border); transition: background .12s; }
+  tbody tr:hover { background: rgba(255,255,255,.03); }
+  tbody tr:last-child { border-bottom: none; }
+  td { padding: 12px 0; color: var(--text); vertical-align: middle; }
+  .chip { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+  .chip-critical { background: rgba(230,57,70,.18); color: #ff6b6b; }
+  .chip-low { background: rgba(244,162,97,.18); color: #f4a261; }
+  .chip-good { background: rgba(46,196,182,.18); color: #2ec4b6; }
+  .chip-done { background: rgba(122,122,148,.15); color: var(--muted); }
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  .field label { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
+  .field input, .field select, .field textarea { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; color: var(--text); font-family: 'DM Sans',sans-serif; font-size: 14px; outline: none; transition: border-color .2s; width: 100%; }
+  .field input:focus, .field select:focus { border-color: var(--red); }
+  option { background: var(--surface2); }
+  .btn { display: inline-flex; align-items: center; gap: 6px; padding: 9px 18px; border-radius: 10px; font-family: 'DM Sans',sans-serif; font-size: 14px; font-weight: 600; cursor: pointer; border: none; transition: all .18s; }
+  .btn-primary { background: var(--red); color: #fff; }
+  .btn-primary:hover { background: #c1121f; box-shadow: 0 4px 14px rgba(230,57,70,.4); transform: translateY(-1px); }
+  .btn-ghost { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+  .btn-ghost:hover { background: rgba(255,255,255,.07); }
+  .donate-big { display: grid; place-items: center; gap: 14px; padding: 40px; background: var(--red-dim); border: 2px dashed rgba(230,57,70,.3); border-radius: 18px; text-align: center; margin-bottom: 20px; }
+  .donate-icon { font-size: 56px; animation: heartbeat 2s ease-in-out infinite; }
+  @keyframes heartbeat { 0%,100%{transform:scale(1)} 14%{transform:scale(1.08)} 28%{transform:scale(1)} 42%{transform:scale(1.05)} 70%{transform:scale(1)} }
+  .donate-title { font-family: 'Syne',sans-serif; font-size: 20px; font-weight: 800; }
+  .donate-sub { color: var(--muted); font-size: 13px; }
+  .toast { position: fixed; bottom: 28px; right: 28px; background: #1e1e28; border: 1px solid var(--border); color: var(--text); font-size: 13px; font-weight: 500; padding: 12px 18px; border-radius: 10px; opacity: 0; transform: translateY(8px); transition: all .25s; z-index: 9999; box-shadow: 0 8px 24px rgba(0,0,0,.4); pointer-events: none; max-width: 320px; }
+  .toast.show { opacity: 1; transform: translateY(0); }
+  .hamburger { display: none; background: none; border: none; color: var(--text); font-size: 20px; cursor: pointer; }
+  .overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 99; }
+  .overlay.show { display: block; }
+  @media(max-width:768px) { .sidebar{transform:translateX(-100%)} .sidebar.open{transform:translateX(0)} .main{margin-left:0} .hamburger{display:block} .content{padding:18px 16px} .topbar{padding:14px 16px} .stat-grid{grid-template-columns:1fr 1fr} }
+  .points-bar { background: var(--surface2); border-radius: 8px; height: 8px; overflow: hidden; margin-top: 8px; }
+  .points-fill { height: 100%; background: linear-gradient(90deg, var(--red), var(--orange)); border-radius: 8px; transition: width .8s ease; }
+  .next-level { font-size: 11px; color: var(--muted); margin-top: 4px; }
+
+  /* ── Acknowledgment / Donor ID Card ── */
+  .id-card { max-width: 520px; margin: 0 auto; border-radius: 20px; overflow: hidden; background: linear-gradient(160deg, var(--surface2), var(--surface)); border: 1px solid var(--border); box-shadow: 0 10px 40px rgba(0,0,0,.35); }
+  .id-card-top { display: flex; align-items: center; justify-content: space-between; padding: 16px 22px; background: linear-gradient(135deg, #e63946, #b91c1c); }
+  .id-card-brand { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 16px; color: #fff; }
+  .id-card-brand span { color: #ffe3e3; }
+  .id-card-badge { font-size: 11px; font-weight: 700; padding: 5px 12px; border-radius: 20px; background: rgba(255,255,255,.15); color: #fff; }
+  .id-card-badge.verified { background: rgba(46,196,182,.9); }
+  .id-card-badge.unverified { background: rgba(244,162,97,.9); }
+  .id-card-body { display: flex; gap: 18px; padding: 22px; align-items: flex-start; }
+  .id-card-avatar { width: 64px; height: 64px; flex-shrink: 0; border-radius: 16px; background: var(--red); display: grid; place-items: center; font-family: 'Syne', sans-serif; font-weight: 800; font-size: 22px; overflow: hidden; }
+  .id-card-info { flex: 1; min-width: 0; }
+  .id-card-name { font-family: 'Syne', sans-serif; font-size: 19px; font-weight: 800; margin-bottom: 10px; }
+  .id-card-row { display: flex; justify-content: space-between; gap: 10px; font-size: 12.5px; padding: 5px 0; border-bottom: 1px dashed var(--border); color: var(--muted); }
+  .id-card-row:last-child { border-bottom: none; }
+  .id-card-row strong { color: var(--text); font-weight: 600; text-align: right; }
+  .id-card-qr { flex-shrink: 0; width: 78px; height: 78px; border-radius: 10px; background: repeating-linear-gradient(45deg, #1a1a22, #1a1a22 4px, #2b2b38 4px, #2b2b38 8px); border: 1px solid var(--border); align-self: center; }
+  .id-card-footer { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 12px 22px; background: rgba(0,0,0,.18); font-size: 11.5px; color: var(--muted); }
+  .id-card-footer strong { color: var(--text); }
+  .id-card-disclaimer { padding: 12px 22px 18px; font-size: 10.5px; line-height: 1.5; color: var(--muted); }
+
+  @media print {
+    body * { visibility: hidden; }
+    #idCard, #idCard * { visibility: visible; }
+    #idCard { position: absolute; top: 0; left: 0; width: 100%; box-shadow: none; }
+  }
+</style>
+</head>
+<body>
+<div class="overlay" id="overlay" onclick="closeSidebar()"></div>
+
+<aside class="sidebar" id="sidebar">
+  <div class="logo">
+    <div class="logo-icon">🩸</div>
+    <div class="logo-text">Blood<span>Bridge</span></div>
+  </div>
+  <nav>
+    <div class="nav-label">My Portal</div>
+    <button class="nav-item active" onclick="navigate('dashboard',this)"><span class="nav-icon">🏠</span> Dashboard</button>
+    <button class="nav-item" onclick="navigate('donate',this)"><span class="nav-icon">🩸</span> Donate Blood</button>
+    <button class="nav-item" onclick="navigate('history',this)"><span class="nav-icon">📜</span> Donation History</button>
+
+    <div class="nav-label">Verification Pipeline</div>
+    <button class="nav-item" onclick="navigate('apply',this)"><span class="nav-icon">📝</span> Become a Verified Donor</button>
+    <button class="nav-item" onclick="navigate('donorrequests',this)"><span class="nav-icon">🏥</span> Hospital Requests
+      {% set waiting_count = incoming_requests|selectattr('status','equalto','Waiting for Donor Response')|list|length %}
+      {% if waiting_count > 0 %}<span class="badge" id="waitingBadge" style="margin-left:auto;background:var(--red);color:#fff;font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px">{{ waiting_count }}</span>{% endif %}
+    </button>
+
+    <div class="nav-label">Information</div>
+    <button class="nav-item" onclick="navigate('inventory',this)"><span class="nav-icon">🧪</span> Blood Inventory</button>
+    <button class="nav-item" onclick="navigate('eligibility',this)"><span class="nav-icon">✅</span> Eligibility Check</button>
+    <button class="nav-item" onclick="navigate('ack',this)"><span class="nav-icon">🪪</span> Acknowledgment Card</button>
+    <button class="nav-item" onclick="navigate('profile',this)"><span class="nav-icon">👤</span> My Profile</button>
+
+    <div class="nav-label">Help</div>
+    <a class="nav-item" href="/static/manual/BloodBridge_User_Manual.pdf" target="_blank" rel="noopener"><span class="nav-icon">📘</span> User Manual (PDF)</a>
+  </nav>
+  <div class="sidebar-footer">
+    <div class="user-card">
+      <div class="avatar" id="sidebarAvatarWrap">{% if user.photo %}<img src="{{ user.photo }}" class="avatar-img" alt="">{% else %}{{ user.avatar }}{% endif %}</div>
+      <div class="user-info">
+        <div class="user-name">{{ user.name }}</div>
+        <div class="user-type">{{ user.blood_group }} Donor</div>
+      </div>
+      <a href="/logout"><button class="logout-btn" title="Logout">⏻</button></a>
+    </div>
+  </div>
+</aside>
+
+<main class="main">
+  <div class="topbar">
+    <div style="display:flex;align-items:center;gap:14px">
+      <button class="hamburger" onclick="toggleSidebar()">☰</button>
+      <h1 id="page-title">Dashboard</h1>
+    </div>
+    <div class="topbar-right">
+      <button class="notif-btn">🔔<div class="notif-dot"></div></button>
+      <button class="btn btn-primary" onclick="navigate('donate',null)" style="font-size:13px;padding:8px 16px">🩸 Donate Now</button>
+    </div>
+  </div>
+
+  <div class="content">
+
+    <!-- DASHBOARD -->
+    <div id="page-dashboard" class="page active">
+      <div class="stat-grid">
+        <div class="stat-card red">
+          <div class="stat-label">Total Donations</div>
+          <div class="stat-value" id="totalDonations">{{ user.donations or 0 }}</div>
+          <div class="stat-sub">{{ user.blood_group }} blood type</div>
+        </div>
+        <div class="stat-card blue">
+          <div class="stat-label">Reward Points</div>
+          <div class="stat-value" id="rewardPoints">{{ user.points or 0 }}</div>
+          <div class="stat-sub">+50 pts per donation</div>
+        </div>
+        <div class="stat-card green">
+          <div class="stat-label">Last Donation</div>
+          <div class="stat-value" style="font-size:17px">{{ user.last_donation or 'Never' }}</div>
+          <div class="stat-sub">Next eligible: 90 days</div>
+        </div>
+        <div class="stat-card orange">
+          <div class="stat-label">Lives Impacted</div>
+          <div class="stat-value">{{ (user.donations or 0) * 3 }}</div>
+          <div class="stat-sub">1 donation = up to 3 lives</div>
+        </div>
+      </div>
+
+      <!-- Points progress -->
+      <div class="card">
+        <div class="card-title"><span>●</span> Donor Rewards Progress</div>
+        <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px">
+          <span>{{ user.points or 0 }} / 500 points to Gold status</span>
+          <span style="color:var(--orange)">🥇 Gold</span>
+        </div>
+        <div class="points-bar"><div class="points-fill" style="width:{{ [(user.points or 0) / 5, 100]|min }}%"></div></div>
+        <div class="next-level">{{ 500 - (user.points or 0) }} more points needed for Gold status</div>
+      </div>
+
+      <!-- Recent donations -->
+      <div class="card">
+        <div class="card-title"><span>●</span> Recent Donations</div>
+        <table>
+          <thead><tr><th>Date</th><th>Blood Group</th><th>Camp / Location</th><th>Units</th></tr></thead>
+          <tbody>
+            {% for d in donations[:5] %}
+            <tr>
+              <td>{{ d.date }}</td>
+              <td><strong>{{ d.blood }}</strong></td>
+              <td>{{ d.camp }}</td>
+              <td>{{ d.units }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="4" style="text-align:center;color:var(--muted);padding:20px">No donations yet — be a hero and donate! 🦸</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- DONATE PAGE -->
+    <div id="page-donate" class="page">
+      <div class="donate-big">
+        <div class="donate-icon">🩸</div>
+        <div class="donate-title">Ready to Save Lives?</div>
+        <div class="donate-sub">Your {{ user.blood_group }} blood can help up to 3 people. Fill in the form below to log a donation.</div>
+      </div>
+
+      <div class="card">
+        <div class="card-title"><span>●</span> Log a Donation</div>
+        <div id="donateError" style="display:none;background:rgba(230,57,70,.1);border:1px solid rgba(230,57,70,.3);color:#ff6b6b;padding:10px 14px;border-radius:8px;margin-bottom:16px;font-size:13px"></div>
+        <div class="form-grid">
+          <div class="field">
+            <label>Blood Group</label>
+            <input type="text" value="{{ user.blood_group }}" readonly style="opacity:.7">
+          </div>
+          <div class="field">
+            <label>Donation Camp / Location</label>
+            <select id="donationCamp">
+              <option>Bhopal Blood Drive</option>
+              <option>Red Cross Camp</option>
+              <option>Hamidia Hospital</option>
+              <option>AIIMS Bhopal</option>
+              <option>Self Donation</option>
+              <option>Other</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Donation Date</label>
+            <input type="date" id="donationDate" value="{{ '' }}">
+          </div>
+          <div class="field">
+            <label>Donor Health Status</label>
+            <select>
+              <option>Healthy — No Issues</option>
+              <option>Minor cold (disclosed)</option>
+            </select>
+          </div>
+        </div>
+        <div style="margin-top:20px;display:flex;gap:12px;align-items:center">
+          <button class="btn btn-primary" id="donateBtn" onclick="submitDonation()">🩸 Submit Donation</button>
+          <span style="font-size:12px;color:var(--muted)">+50 points will be awarded</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- HISTORY PAGE -->
+    <div id="page-history" class="page">
+      <div class="card">
+        <div class="card-title"><span>●</span> Full Donation History</div>
+        <table>
+          <thead><tr><th>Date</th><th>Blood Group</th><th>Camp</th><th>Units</th></tr></thead>
+          <tbody id="historyTable">
+            {% for d in donations %}
+            <tr>
+              <td>{{ d.date }}</td>
+              <td><strong>{{ d.blood }}</strong></td>
+              <td>{{ d.camp }}</td>
+              <td>{{ d.units }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="4" style="text-align:center;color:var(--muted);padding:30px">No donation history yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- BECOME A VERIFIED DONOR PAGE -->
+    <div id="page-apply" class="page">
+      {% if latest_application %}
+      <div class="card" style="border-left:3px solid {% if latest_application.status=='Verified' %}var(--green){% elif latest_application.status=='Rejected' %}var(--red){% else %}var(--orange){% endif %}">
+        <div class="card-title"><span>●</span> Your Verification Status</div>
+        <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+          <span class="chip {% if latest_application.status=='Verified' %}chip-good{% elif latest_application.status=='Rejected' %}chip-critical{% else %}chip-low{% endif %}" style="font-size:12px;padding:6px 14px">
+            {% if latest_application.status=='Pending Verification' %}⏳{% elif latest_application.status=='Verified' %}✅{% else %}❌{% endif %} {{ latest_application.status }}
+          </span>
+          <span style="font-size:13px;color:var(--muted)">{{ latest_application.blood_group }} · Submitted {{ latest_application.submitted_date }}</span>
+        </div>
+        {% if latest_application.status == 'Pending Verification' %}
+        <p style="font-size:13px;color:var(--muted);margin-top:12px">Your request is with the BloodBridge admin team for verification. Once approved, you'll appear in the Verified Donor pool that hospitals can search and request directly.</p>
+        {% elif latest_application.status == 'Verified' %}
+        <p style="font-size:13px;color:var(--green);margin-top:12px">🎉 You're a Verified Donor! Hospitals in need of {{ latest_application.blood_group }} can now find and request you. Check "Hospital Requests" for incoming calls.</p>
+        {% else %}
+        <p style="font-size:13px;color:var(--muted);margin-top:12px">Your last application wasn't approved. You can submit a fresh request below.</p>
+        {% endif %}
+      </div>
+      {% endif %}
+
+      <div class="card">
+        <div class="card-title"><span>●</span> Submit a Donation Request</div>
+        <p style="color:var(--muted);font-size:13px;margin-bottom:18px">This starts the official BloodBridge pipeline: Admin verifies your details first — hospitals can only see and request <strong>verified</strong> donors. This keeps the network safe from fake entries and spam requests.</p>
+        <div id="applyError" style="display:none;background:rgba(230,57,70,.1);border:1px solid rgba(230,57,70,.3);color:#ff6b6b;padding:10px 14px;border-radius:8px;margin-bottom:16px;font-size:13px"></div>
+        <div class="form-grid">
+          <div class="field">
+            <label>Blood Group</label>
+            <select id="ap-blood">
+              <option value="A+">A+</option><option value="A-">A-</option>
+              <option value="B+">B+</option><option value="B-">B-</option>
+              <option value="AB+">AB+</option><option value="AB-">AB-</option>
+              <option value="O+" {% if user.blood_group=='O+' %}selected{% endif %}>O+</option>
+              <option value="O-">O-</option>
+            </select>
+          </div>
+          <div class="field"><label>Phone Number</label><input type="text" id="ap-phone" value="{{ user.phone or '' }}" placeholder="+91 XXXXX XXXXX"></div>
+          <div class="field"><label>City</label><input type="text" id="ap-city" value="{{ user.city or '' }}" placeholder="e.g. Bhopal"></div>
+          <div class="field"><label>Availability Date</label><input type="date" id="ap-date"></div>
+          <div class="field" style="grid-column:1/-1"><label>Address</label><input type="text" id="ap-address" placeholder="Full address for pickup / camp coordination"></div>
+        </div>
+        <button class="btn btn-primary" style="margin-top:20px" onclick="submitApplication()">📝 Submit for Verification</button>
+      </div>
+    </div>
+
+    <!-- HOSPITAL REQUESTS PAGE -->
+    <div id="page-donorrequests" class="page">
+      <div class="card">
+        <div class="card-title"><span>●</span> Requests From Hospitals</div>
+        <p style="color:var(--muted);font-size:13px;margin-bottom:16px">Once verified, hospitals needing your blood type can request you directly. Accept to schedule a donation, or decline if you're unavailable.</p>
+        <table>
+          <thead><tr><th>Hospital</th><th>Blood Group</th><th>Units</th><th>Status</th><th>Requested</th><th>Action</th></tr></thead>
+          <tbody id="donorReqTable">
+            {% for r in incoming_requests %}
+            <tr data-id="{{ r.id }}">
+              <td><strong>{{ r.hospital_name }}</strong></td>
+              <td>{{ r.blood_group }}</td>
+              <td>{{ r.units }}</td>
+              <td>
+                <span class="chip {% if r.status=='Accepted' %}chip-good{% elif r.status=='Rejected' %}chip-critical{% elif r.status=='Completed' %}chip-done{% else %}chip-low{% endif %}">{{ r.status }}</span>
+                {% if r.appointment_date %}<div style="font-size:11px;color:var(--muted);margin-top:3px">📅 {{ r.appointment_date }}</div>{% endif %}
+              </td>
+              <td style="color:var(--muted)">{{ r.request_date }}</td>
+              <td>
+                {% if r.status == 'Waiting for Donor Response' %}
+                <button class="btn btn-primary" style="padding:6px 12px;font-size:12px" onclick="respondRequest({{ r.id }},'accept',this)">✅ Accept</button>
+                <button class="btn btn-ghost" style="padding:6px 12px;font-size:12px" onclick="respondRequest({{ r.id }},'reject',this)">✖ Decline</button>
+                {% else %}
+                <span style="color:var(--muted);font-size:12px">—</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="6" style="text-align:center;color:var(--muted);padding:30px">No hospital requests yet. Get verified to start receiving requests!</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- INVENTORY PAGE -->
+    <div id="page-inventory" class="page">
+      <div class="card">
+        <div class="card-title"><span>●</span> Current Blood Inventory (Live)</div>
+        <table>
+          <thead><tr><th>Blood Group</th><th>Available Units</th><th>Status</th></tr></thead>
+          <tbody id="inventoryTable">
+            {% for bg, data in inventory.items() %}
+            <tr>
+              <td><strong>{{ bg }}</strong></td>
+              <td>{{ data.units }}</td>
+              <td>
+                {% if data.critical %}<span class="chip chip-critical">Critical</span>
+                {% elif data.units < 30 %}<span class="chip chip-low">Low</span>
+                {% else %}<span class="chip chip-good">Sufficient</span>{% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        <p style="font-size:12px;color:var(--muted);margin-top:14px">📌 View only — inventory is managed by admins. <button onclick="refreshInventory()" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:12px">🔄 Refresh</button></p>
+      </div>
+    </div>
+
+    <!-- PROFILE PAGE -->
+    <div id="page-profile" class="page">
+      <div class="card">
+        <div style="display:flex;align-items:center;gap:20px;margin-bottom:28px;flex-wrap:wrap">
+          <div class="avatar" style="width:64px;height:64px;font-size:22px;border-radius:16px" id="profileAvatarWrap">{% if user.photo %}<img src="{{ user.photo }}" class="avatar-img" alt="">{% else %}{{ user.avatar }}{% endif %}</div>
+          <div>
+            <div style="font-family:'Syne',sans-serif;font-size:22px;font-weight:800">{{ user.name }}</div>
+            <div style="color:var(--muted);font-size:13px">{{ user.blood_group }} · Registered Donor · {{ user.city or 'India' }}</div>
+            <div style="margin-top:10px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+              <input type="file" id="photoInput" accept="image/*" style="display:none" onchange="handlePhotoSelect(event)">
+              <button class="btn btn-ghost" style="padding:7px 14px;font-size:12.5px" onclick="document.getElementById('photoInput').click()">📷 Choose Photo</button>
+              <button class="btn btn-primary" id="uploadPhotoBtn" style="padding:7px 14px;font-size:12.5px;display:none" onclick="uploadPhoto()">⬆️ Upload Photo</button>
+              <span id="photoHint" style="font-size:11px;color:var(--muted)">JPG/PNG, under 3MB. Used on your dashboard and Acknowledgment Card.</span>
+            </div>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px">
+          <div style="background:var(--surface2);border-radius:12px;padding:16px"><div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em">Blood Group</div><div style="font-family:'Syne',sans-serif;font-size:20px;font-weight:800;margin-top:4px;color:var(--red)">{{ user.blood_group }}</div></div>
+          <div style="background:var(--surface2);border-radius:12px;padding:16px"><div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em">Total Donations</div><div style="font-family:'Syne',sans-serif;font-size:20px;font-weight:800;margin-top:4px">{{ user.donations or 0 }}</div></div>
+          <div style="background:var(--surface2);border-radius:12px;padding:16px"><div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em">Reward Points</div><div style="font-family:'Syne',sans-serif;font-size:20px;font-weight:800;margin-top:4px;color:var(--orange)">{{ user.points or 0 }}</div></div>
+          <div style="background:var(--surface2);border-radius:12px;padding:16px"><div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em">City</div><div style="font-size:15px;font-weight:600;margin-top:4px">{{ user.city or 'N/A' }}</div></div>
+          <div style="background:var(--surface2);border-radius:12px;padding:16px"><div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em">Phone</div><div style="font-size:15px;font-weight:600;margin-top:4px">{{ user.phone or 'N/A' }}</div></div>
+          <div style="background:var(--surface2);border-radius:12px;padding:16px"><div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em">Last Donation</div><div style="font-size:14px;font-weight:600;margin-top:4px">{{ user.last_donation or 'Never' }}</div></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title"><span>●</span> More Information</div>
+        <p style="color:var(--muted);font-size:13px;margin-bottom:18px">
+          Keeping this filled in helps camp staff and hospitals verify your identity faster, and
+          keeps your Acknowledgment Card accurate.
+        </p>
+        <div id="profileError" style="display:none;background:rgba(230,57,70,.1);border:1px solid rgba(230,57,70,.3);color:#ff6b6b;padding:10px 14px;border-radius:8px;margin-bottom:16px;font-size:13px"></div>
+        <div class="form-grid">
+          <div class="field"><label>Phone Number</label><input type="text" id="pf-phone" value="{{ user.phone or '' }}" placeholder="+91 XXXXX XXXXX"></div>
+          <div class="field"><label>City</label><input type="text" id="pf-city" value="{{ user.city or '' }}" placeholder="e.g. Bhopal"></div>
+          <div class="field"><label>Date of Birth</label><input type="date" id="pf-dob" value="{{ user.dob or '' }}"></div>
+          <div class="field">
+            <label>Gender</label>
+            <select id="pf-gender">
+              <option value="" {% if not user.gender %}selected{% endif %}>Select</option>
+              <option value="Male" {% if user.gender=='Male' %}selected{% endif %}>Male</option>
+              <option value="Female" {% if user.gender=='Female' %}selected{% endif %}>Female</option>
+              <option value="Other" {% if user.gender=='Other' %}selected{% endif %}>Other</option>
+            </select>
+          </div>
+          <div class="field"><label>Weight (kg)</label><input type="number" id="pf-weight" value="{{ user.weight or '' }}" placeholder="e.g. 65"></div>
+          <div class="field"><label>Govt. ID / Aadhar No.</label><input type="text" id="pf-idproof" value="{{ user.id_proof or '' }}" placeholder="e.g. XXXX-XXXX-1234"></div>
+          <div class="field" style="grid-column:1/-1"><label>Address</label><input type="text" id="pf-address" value="{{ user.address or '' }}" placeholder="Full residential address"></div>
+          <div class="field"><label>Emergency Contact Name</label><input type="text" id="pf-ec-name" value="{{ user.emergency_contact_name or '' }}" placeholder="Contact's full name"></div>
+          <div class="field"><label>Emergency Contact Phone</label><input type="text" id="pf-ec-phone" value="{{ user.emergency_contact_phone or '' }}" placeholder="+91 XXXXX XXXXX"></div>
+        </div>
+        <button class="btn btn-primary" style="margin-top:20px" onclick="saveProfile()">💾 Save Changes</button>
+      </div>
+    </div>
+
+    <!-- ELIGIBILITY PAGE -->
+    <div id="page-eligibility" class="page">
+      <div class="card">
+        <div class="card-title"><span>●</span> Eligibility Checker</div>
+        <p style="color:var(--muted);font-size:14px;margin-bottom:20px">Check if you're eligible to donate today based on health criteria.</p>
+        <div class="form-grid">
+          <div class="field"><label>Age (years)</label><input type="number" id="e-age" placeholder="e.g. 28" min="18" max="65"></div>
+          <div class="field"><label>Weight (kg)</label><input type="number" id="e-weight" placeholder="e.g. 65" min="45"></div>
+          <div class="field"><label>Last donation date</label><input type="date" id="e-last"></div>
+          <div class="field"><label>Health condition</label><select id="e-health"><option>Healthy / No issues</option><option>Minor cold/cough</option><option>On medication</option><option>Recent surgery</option><option>Chronic illness</option></select></div>
+        </div>
+        <button class="btn btn-primary" style="margin-top:20px" onclick="checkEligibility()">🔍 Check Eligibility</button>
+        <div id="elig-result" style="margin-top:20px;display:none"></div>
+      </div>
+    </div>
+
+    <!-- ACKNOWLEDGMENT / DONOR ID CARD PAGE -->
+    <div id="page-ack" class="page">
+      <div class="card" id="ackIntroCard">
+        <div class="card-title"><span>●</span> Donor Acknowledgment Card</div>
+        <p style="color:var(--muted);font-size:13px;margin-bottom:4px">
+          A printable proof-of-identity card for BloodBridge donors — show it at a donation camp
+          or hospital counter so staff can quickly confirm <strong>it's really you</strong> and
+          match you against your verified donor record.
+        </p>
+        <p style="color:var(--muted);font-size:12px">
+          It carries your unique Donor ID and a verification code that changes with your donation
+          count, so an old printout can't be reused to impersonate a different status.
+        </p>
+      </div>
+
+      <div class="card" id="ackCardWrapper">
+        <div id="idCard" class="id-card">
+          <div class="id-card-top">
+            <div class="id-card-brand">🩸 Blood<span>Bridge</span></div>
+            <div class="id-card-badge {% if is_verified_donor %}verified{% else %}unverified{% endif %}" id="ackBadge">
+              {% if is_verified_donor %}✅ Verified Donor{% else %}⏳ Not Yet Verified{% endif %}
+            </div>
+          </div>
+          <div class="id-card-body">
+            <div class="id-card-avatar" id="ackAvatarWrap">{% if user.photo %}<img src="{{ user.photo }}" class="avatar-img" alt="">{% else %}{{ user.avatar }}{% endif %}</div>
+            <div class="id-card-info">
+              <div class="id-card-name" id="ackName">{{ user.name }}</div>
+              <div class="id-card-row"><span>Donor ID</span><strong id="ackDonorId">{{ donor_code }}</strong></div>
+              <div class="id-card-row"><span>Blood Group</span><strong id="ackBloodGroup">{{ user.blood_group }}</strong></div>
+              <div class="id-card-row"><span>City</span><strong id="ackCity">{{ user.city or '—' }}</strong></div>
+              <div class="id-card-row"><span>Phone</span><strong id="ackPhone">{{ user.phone or '—' }}</strong></div>
+              <div class="id-card-row"><span>Total Donations</span><strong id="ackDonations">{{ user.donations or 0 }}</strong></div>
+              <div class="id-card-row"><span>Last Donation</span><strong id="ackLastDonation">{{ user.last_donation or 'Never' }}</strong></div>
+            </div>
+            <div class="id-card-qr" id="ackQr"></div>
+          </div>
+          <div class="id-card-footer">
+            <div>Verification Code: <strong id="ackVerifCode">{{ verification_code }}</strong></div>
+            <div>Issued: <strong id="ackIssueDate">{{ issue_date }}</strong></div>
+          </div>
+          <div class="id-card-disclaimer">
+            This card confirms the holder is a registered BloodBridge donor. Camp / hospital staff
+            can verify authenticity by cross-checking the Donor ID and Verification Code against
+            the BloodBridge admin records.
+          </div>
+        </div>
+
+        <div style="margin-top:20px;display:flex;gap:12px;flex-wrap:wrap;align-items:center">
+          <button class="btn btn-primary" onclick="printAckCard()">🖨️ Print / Save as PDF</button>
+          <button class="btn btn-ghost" onclick="refreshAckCard()">🔄 Refresh Card</button>
+          <span style="font-size:12px;color:var(--muted)">Card details are pulled live from your profile — keep your info up to date on the "My Profile" page.</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<!-- ── BloodBridge Assistant (Chatbot) ── -->
+<button class="chatbot-fab" id="chatbotFab" onclick="toggleChatbot()" title="BloodBridge Assistant">
+  💬<span class="fab-dot"></span>
+</button>
+<div class="chatbot-panel" id="chatbotPanel">
+  <div class="chatbot-header">
+    <div class="cb-icon">🩸</div>
+    <div>
+      <div class="cb-title">BloodBridge Assistant</div>
+      <div class="cb-sub">Ask me anything about your donations</div>
+    </div>
+    <button class="chatbot-close" onclick="toggleChatbot()">✕</button>
+  </div>
+  <div class="chatbot-body" id="chatbotBody">
+    <div class="cb-msg bot">Hi {{ user.name.split(' ')[0] }}! 👋 I'm your BloodBridge Assistant. Ask me about your eligibility, Donor ID, blood group compatibility, points, or hospital requests.</div>
+  </div>
+  <div class="cb-suggestions" id="cbSuggestions">
+    <div class="cb-chip" onclick="sendChatSuggestion('Am I eligible to donate right now?')">Am I eligible?</div>
+    <div class="cb-chip" onclick="sendChatSuggestion('What is my Donor ID?')">My Donor ID</div>
+    <div class="cb-chip" onclick="sendChatSuggestion('Which blood groups can I donate to?')">Blood compatibility</div>
+    <div class="cb-chip" onclick="sendChatSuggestion('How many reward points do I have?')">My points</div>
+  </div>
+  <div class="chatbot-input-row">
+    <input type="text" id="chatbotInput" placeholder="Type your question..." onkeydown="if(event.key==='Enter') sendChatMessage()">
+    <button class="chatbot-send" onclick="sendChatMessage()">➤</button>
+  </div>
+</div>
+
+<script>
+const pageTitles = {dashboard:'Dashboard',donate:'Donate Blood',history:'Donation History',inventory:'Blood Inventory',profile:'My Profile',eligibility:'Eligibility Check',apply:'Become a Verified Donor',donorrequests:'Hospital Requests',ack:'Acknowledgment Card'};
+
+function navigate(page, btn) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + page).classList.add('active');
+  if (btn) btn.classList.add('active');
+  document.getElementById('page-title').textContent = pageTitles[page] || page;
+  if (window.innerWidth <= 768) closeSidebar();
+}
+function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open'); document.getElementById('overlay').classList.toggle('show'); }
+function closeSidebar() { document.getElementById('sidebar').classList.remove('open'); document.getElementById('overlay').classList.remove('show'); }
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3500);
+}
+
+// Set default date to today
+document.getElementById('donationDate').value = new Date().toISOString().split('T')[0];
+
+async function submitDonation() {
+  const camp = document.getElementById('donationCamp').value;
+  const btn = document.getElementById('donateBtn');
+  const err = document.getElementById('donateError');
+  err.style.display = 'none';
+  btn.disabled = true; btn.textContent = '⏳ Submitting...';
+
+  try {
+    const res = await fetch('/api/donate', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({camp})
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast('🩸 Donation logged! +50 points awarded. Thank you, hero!');
+      // Update stats
+      const td = document.getElementById('totalDonations');
+      const rp = document.getElementById('rewardPoints');
+      if (td) td.textContent = parseInt(td.textContent) + 1;
+      if (rp) rp.textContent = data.new_points;
+      // Add to history table
+      const htable = document.getElementById('historyTable');
+      if (htable) {
+        const d = data.donation;
+        const row = `<tr><td>${d.date}</td><td><strong>${d.blood}</strong></td><td>${d.camp}</td><td>${d.units}</td></tr>`;
+        if (htable.innerHTML.includes('No donation')) htable.innerHTML = row;
+        else htable.insertAdjacentHTML('afterbegin', row);
+      }
+      navigate('history', null);
+    } else {
+      err.textContent = data.message || 'Error submitting donation';
+      err.style.display = 'block';
+    }
+  } catch(e) {
+    err.textContent = 'Network error. Please try again.';
+    err.style.display = 'block';
+  }
+  btn.disabled = false; btn.innerHTML = '🩸 Submit Donation';
+}
+
+async function refreshInventory() {
+  try {
+    const res = await fetch('/api/inventory');
+    const inv = await res.json();
+    const tbody = document.getElementById('inventoryTable');
+    if (!tbody) return;
+    tbody.innerHTML = Object.entries(inv).map(([bg, data]) => {
+      const statusClass = data.critical ? 'chip-critical' : data.units < 30 ? 'chip-low' : 'chip-good';
+      const statusText = data.critical ? 'Critical' : data.units < 30 ? 'Low' : 'Sufficient';
+      return `<tr><td><strong>${bg}</strong></td><td>${data.units}</td><td><span class="chip ${statusClass}">${statusText}</span></td></tr>`;
+    }).join('');
+  } catch(e) {}
+}
+
+async function submitApplication() {
+  const blood_group = document.getElementById('ap-blood').value;
+  const phone = document.getElementById('ap-phone').value;
+  const city = document.getElementById('ap-city').value;
+  const address = document.getElementById('ap-address').value;
+  const availability_date = document.getElementById('ap-date').value;
+  const err = document.getElementById('applyError');
+  err.style.display = 'none';
+  if (!phone || !address) { err.textContent = 'Please fill in phone and address'; err.style.display = 'block'; return; }
+  try {
+    const res = await fetch('/api/donor/apply', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({blood_group, phone, city, address, availability_date})
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast('📝 Submitted! Admin will verify your details shortly.');
+      setTimeout(() => location.reload(), 1200);
+    } else {
+      err.textContent = data.message || 'Error submitting request';
+      err.style.display = 'block';
+    }
+  } catch(e) {
+    err.textContent = 'Network error. Please try again.';
+    err.style.display = 'block';
+  }
+}
+
+async function respondRequest(id, action, btn) {
+  btn.disabled = true;
+  let appointment_date = null;
+  if (action === 'accept') {
+    appointment_date = prompt('Confirm an appointment date for this donation (YYYY-MM-DD):', new Date().toISOString().split('T')[0]);
+    if (!appointment_date) { btn.disabled = false; return; }
+  }
+  try {
+    const res = await fetch(`/api/donor/requests/${id}/respond`, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({action, appointment_date})
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast(action === 'accept' ? '✅ Donation scheduled! Thank you for saying yes.' : 'Request declined');
+      setTimeout(() => location.reload(), 900);
+    }
+  } catch(e) { showToast('❌ Network error'); btn.disabled = false; }
+}
+
+let selectedPhotoDataUrl = null;
+
+function handlePhotoSelect(event) {
+  const file = event.target.files[0];
+  const hint = document.getElementById('photoHint');
+  const uploadBtn = document.getElementById('uploadPhotoBtn');
+  if (!file) return;
+  if (!file.type.startsWith('image/')) {
+    hint.textContent = 'Please choose an image file.';
+    return;
+  }
+  if (file.size > 3 * 1024 * 1024) {
+    hint.textContent = 'That image is over 3MB — please pick a smaller one.';
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = () => {
+    selectedPhotoDataUrl = reader.result;
+    // Live preview in the profile header
+    document.getElementById('profileAvatarWrap').innerHTML = `<img src="${selectedPhotoDataUrl}" class="avatar-img" alt="">`;
+    hint.textContent = 'Photo selected — click "Upload Photo" to save it.';
+    uploadBtn.style.display = 'inline-flex';
+  };
+  reader.readAsDataURL(file);
+}
+
+async function uploadPhoto() {
+  if (!selectedPhotoDataUrl) return;
+  const uploadBtn = document.getElementById('uploadPhotoBtn');
+  const hint = document.getElementById('photoHint');
+  uploadBtn.disabled = true;
+  uploadBtn.textContent = '⏳ Uploading...';
+  try {
+    const res = await fetch('/api/donor/profile/photo', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({photo: selectedPhotoDataUrl})
+    });
+    const data = await res.json();
+    if (data.success) {
+      // Update every avatar spot on the page
+      ['sidebarAvatarWrap', 'profileAvatarWrap', 'ackAvatarWrap'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.innerHTML = `<img src="${data.photo}" class="avatar-img" alt="">`;
+      });
+      hint.textContent = 'Photo updated!';
+      uploadBtn.style.display = 'none';
+      showToast('📷 Profile photo updated!');
+    } else {
+      hint.textContent = data.message || 'Upload failed. Please try again.';
+    }
+  } catch (e) {
+    hint.textContent = 'Network error. Please try again.';
+  }
+  uploadBtn.disabled = false;
+  uploadBtn.textContent = '⬆️ Upload Photo';
+}
+
+async function saveProfile() {
+  const err = document.getElementById('profileError');
+  err.style.display = 'none';
+  const payload = {
+    phone: document.getElementById('pf-phone').value,
+    city: document.getElementById('pf-city').value,
+    dob: document.getElementById('pf-dob').value,
+    gender: document.getElementById('pf-gender').value,
+    weight: document.getElementById('pf-weight').value,
+    id_proof: document.getElementById('pf-idproof').value,
+    address: document.getElementById('pf-address').value,
+    emergency_contact_name: document.getElementById('pf-ec-name').value,
+    emergency_contact_phone: document.getElementById('pf-ec-phone').value
+  };
+  try {
+    const res = await fetch('/api/donor/profile/update', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast('✅ Profile updated!');
+      refreshAckCard();
+    } else {
+      err.textContent = data.message || 'Could not update profile';
+      err.style.display = 'block';
+    }
+  } catch (e) {
+    err.textContent = 'Network error. Please try again.';
+    err.style.display = 'block';
+  }
+}
+
+function printAckCard() {
+  window.print();
+}
+
+async function refreshAckCard() {
+  try {
+    const res = await fetch('/api/donor/acknowledgment');
+    const d = await res.json();
+    document.getElementById('ackName').textContent = d.name;
+    document.getElementById('ackDonorId').textContent = d.donor_code;
+    document.getElementById('ackBloodGroup').textContent = d.blood_group || '—';
+    document.getElementById('ackCity').textContent = d.city || '—';
+    document.getElementById('ackPhone').textContent = d.phone || '—';
+    document.getElementById('ackDonations').textContent = d.donations;
+    document.getElementById('ackLastDonation').textContent = d.last_donation || 'Never';
+    document.getElementById('ackVerifCode').textContent = d.verification_code;
+    document.getElementById('ackIssueDate').textContent = d.issue_date;
+    if (d.photo) {
+      document.getElementById('ackAvatarWrap').innerHTML = `<img src="${d.photo}" class="avatar-img" alt="">`;
+    }
+    const badge = document.getElementById('ackBadge');
+    badge.classList.toggle('verified', d.is_verified_donor);
+    badge.classList.toggle('unverified', !d.is_verified_donor);
+    badge.textContent = d.is_verified_donor ? '✅ Verified Donor' : '⏳ Not Yet Verified';
+    showToast('🪪 Acknowledgment card refreshed');
+  } catch (e) {
+    showToast('❌ Could not refresh card');
+  }
+}
+
+function checkEligibility() {
+  const age = parseInt(document.getElementById('e-age').value) || 0;
+  const weight = parseInt(document.getElementById('e-weight').value) || 0;
+  const health = document.getElementById('e-health').value;
+  const r = document.getElementById('elig-result');
+  r.style.display = 'block';
+  const eligible = age >= 18 && age <= 65 && weight >= 45 && health === 'Healthy / No issues';
+  if (eligible) {
+    r.innerHTML = `<div style="background:rgba(46,196,182,.1);border:1px solid #2ec4b6;border-radius:12px;padding:18px 22px"><div style="font-family:'Syne',sans-serif;font-size:16px;font-weight:700;color:#2ec4b6;margin-bottom:6px">✅ You are Eligible to Donate!</div><div style="font-size:13px;color:var(--muted)">Based on your inputs, you meet basic criteria. Visit a certified blood bank for a final health check.</div></div>`;
+  } else {
+    r.innerHTML = `<div style="background:rgba(230,57,70,.1);border:1px solid var(--red);border-radius:12px;padding:18px 22px"><div style="font-family:'Syne',sans-serif;font-size:16px;font-weight:700;color:var(--red);margin-bottom:6px">⚠️ Not Currently Eligible</div><div style="font-size:13px;color:var(--muted)">You don't meet one or more criteria (age 18-65, weight ≥45kg, good health). Please consult your doctor.</div></div>`;
+  }
+}
+
+/* ── BloodBridge Assistant (Chatbot) ── */
+function toggleChatbot() {
+  const panel = document.getElementById('chatbotPanel');
+  panel.classList.toggle('open');
+  if (panel.classList.contains('open')) {
+    document.getElementById('chatbotInput').focus();
+    document.getElementById('chatbotFab').querySelector('.fab-dot').style.display = 'none';
+  }
+}
+
+function appendChatMessage(text, sender) {
+  const body = document.getElementById('chatbotBody');
+  const div = document.createElement('div');
+  div.className = 'cb-msg ' + sender;
+  div.innerHTML = text;
+  body.appendChild(div);
+  body.scrollTop = body.scrollHeight;
+}
+
+function showTyping() {
+  const body = document.getElementById('chatbotBody');
+  const div = document.createElement('div');
+  div.className = 'cb-typing';
+  div.id = 'cbTypingIndicator';
+  div.innerHTML = '<span></span><span></span><span></span>';
+  body.appendChild(div);
+  body.scrollTop = body.scrollHeight;
+}
+function hideTyping() {
+  const el = document.getElementById('cbTypingIndicator');
+  if (el) el.remove();
+}
+
+async function sendChatMessage() {
+  const input = document.getElementById('chatbotInput');
+  const message = input.value.trim();
+  if (!message) return;
+  appendChatMessage(message, 'user');
+  input.value = '';
+  document.getElementById('cbSuggestions').style.display = 'none';
+  showTyping();
+  try {
+    const res = await fetch('/api/donor/chatbot', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({message})
+    });
+    const data = await res.json();
+    hideTyping();
+    appendChatMessage(data.reply || "Sorry, I couldn't process that.", 'bot');
+  } catch (e) {
+    hideTyping();
+    appendChatMessage("⚠️ Network error. Please try again.", 'bot');
+  }
+}
+
+function sendChatSuggestion(text) {
+  document.getElementById('chatbotInput').value = text;
+  sendChatMessage();
+}
+</script>
+</body>
+</html>
